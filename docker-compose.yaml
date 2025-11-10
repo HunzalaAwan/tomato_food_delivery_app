@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   mongo:
@@ -10,7 +10,7 @@ services:
       - mongo_data:/data/db
 
   backend:
-    image: backend-prod
+    image: hunzala00/backend-prod:latest
     container_name: backend
     ports:
       - "4000:4000"
@@ -20,7 +20,7 @@ services:
       - mongo
 
   frontend:
-    image: frontend-prod:latest
+    image: hunzala00/frontend-prod:latest
     container_name: frontend
     ports:
       - "5173:5173"
@@ -28,11 +28,10 @@ services:
       - backend
 
   admin:
-    image: admin-prod:latest
+    image: hunzala00/admin-prod:latest
     container_name: admin
     ports:
       - "5174:5174"
 
 volumes:
   mongo_data:
-
