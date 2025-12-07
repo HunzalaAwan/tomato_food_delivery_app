@@ -29,7 +29,7 @@ pipeline {
 
         stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'DOCKER_HUB', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
                     sh '''
                         echo "$PASS" | docker login -u "$USER" --password-stdin
                     '''
@@ -57,9 +57,9 @@ pipeline {
             steps {
                 sh '''
                     echo "Deploying with Docker Compose..."
-                    docker-compose down || true
-                    docker-compose pull
-                    docker-compose up -d --remove-orphans
+                    docker compose down || true
+                    docker compose pull
+                    docker compose up -d --remove-orphans
                     echo "Deployment complete. Running containers:"
                     docker ps
                 '''
@@ -140,93 +140,110 @@ pipeline {
                 }
                 
                 // Extract test summary
-                def passingTests = (testLog =~ /(\d+) passing/)[0][1] ?: '0'
+                def passingTests = '0'
                 def failingTests = '0'
                 try {
-                    failingTests = (testLog =~ /(\d+) failing/)[0][1]
+                    def passingMatch = (testLog =~ /(\d+) passing/)
+                    if (passingMatch) {
+                        passingTests = passingMatch[0][1]
+                    }
+                } catch (Exception e) {
+                    passingTests = '0'
+                }
+                try {
+                    def failingMatch = (testLog =~ /(\d+) failing/)
+                    if (failingMatch) {
+                        failingTests = failingMatch[0][1]
+                    }
                 } catch (Exception e) {
                     failingTests = '0'
                 }
                 
-                emailext(
-                    subject: "✅ SUCCESS: Tomato Food Delivery App - Build #${BUILD_NUMBER} - All Tests Passed!",
-                    body: """
-                        <html>
-                        <body style="font-family: Arial, sans-serif;">
-                            <h2 style="color: #28a745;">✅ Build Successful - All Tests Passed!</h2>
-                            
-                            <h3>Build Information:</h3>
-                            <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
-                                <tr style="background-color: #f8f9fa;">
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Project:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">Tomato Food Delivery App</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build Number:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">#${BUILD_NUMBER}</td>
-                                </tr>
-                                <tr style="background-color: #f8f9fa;">
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build URL:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}">${BUILD_URL}</a></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Branch:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">main</td>
-                                </tr>
-                            </table>
-                            
-                            <h3 style="color: #28a745;">Test Results Summary:</h3>
-                            <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
-                                <tr style="background-color: #d4edda;">
-                                    <td style="padding: 10px; border: 1px solid #c3e6cb;"><strong>Tests Passed:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #c3e6cb; color: #155724;">${passingTests}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Tests Failed:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">${failingTests}</td>
-                                </tr>
-                                <tr style="background-color: #f8f9fa;">
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Status:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6; color: #28a745;"><strong>ALL TESTS PASSED ✅</strong></td>
-                                </tr>
-                            </table>
-                            
-                            <h3>Test Cases Executed:</h3>
-                            <ol>
-                                <li>Homepage Loading and Verification</li>
-                                <li>User Registration</li>
-                                <li>User Login</li>
-                                <li>Menu Exploration and Category Filtering</li>
-                                <li>Adding Items to Cart</li>
-                                <li>Removing Items from Cart</li>
-                                <li>Cart Page Functionality</li>
-                                <li>Checkout Navigation</li>
-                                <li>User Logout</li>
-                                <li>Footer and Page Elements Verification</li>
-                            </ol>
-                            
-                            <h3>Deployment Status:</h3>
-                            <p style="color: #28a745;"><strong>✅ Application successfully deployed and running!</strong></p>
-                            <ul>
-                                <li>Frontend: <a href="http://localhost:5173">http://localhost:5173</a></li>
-                                <li>Backend API: <a href="http://localhost:4000">http://localhost:4000</a></li>
-                                <li>Admin Panel: <a href="http://localhost:5174">http://localhost:5174</a></li>
-                            </ul>
-                            
-                            <hr style="border: 1px solid #dee2e6; margin: 20px 0;">
-                            <p style="color: #6c757d; font-size: 12px;">
-                                This is an automated message from Jenkins CI/CD Pipeline.<br>
-                                Build triggered at: ${new Date()}
-                            </p>
-                        </body>
-                        </html>
-                    """,
-                    to: "${NOTIFICATION_EMAIL}",
-                    mimeType: 'text/html',
-                    attachmentsPattern: 'tests/test-results.log'
-                )
+                // Try to send email, but don't fail if it doesn't work
+                try {
+                    emailext(
+                        subject: "✅ SUCCESS: Tomato Food Delivery App - Build #${BUILD_NUMBER} - All Tests Passed!",
+                        body: """
+                            <html>
+                            <body style="font-family: Arial, sans-serif;">
+                                <h2 style="color: #28a745;">✅ Build Successful - All Tests Passed!</h2>
+                                
+                                <h3>Build Information:</h3>
+                                <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Project:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">Tomato Food Delivery App</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build Number:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">#${BUILD_NUMBER}</td>
+                                    </tr>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build URL:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}">${BUILD_URL}</a></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Branch:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">main</td>
+                                    </tr>
+                                </table>
+                                
+                                <h3 style="color: #28a745;">Test Results Summary:</h3>
+                                <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+                                    <tr style="background-color: #d4edda;">
+                                        <td style="padding: 10px; border: 1px solid #c3e6cb;"><strong>Tests Passed:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #c3e6cb; color: #155724;">${passingTests}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Tests Failed:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">${failingTests}</td>
+                                    </tr>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Status:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6; color: #28a745;"><strong>ALL TESTS PASSED ✅</strong></td>
+                                    </tr>
+                                </table>
+                                
+                                <h3>Test Cases Executed:</h3>
+                                <ol>
+                                    <li>Homepage Loading and Verification</li>
+                                    <li>User Registration</li>
+                                    <li>User Login</li>
+                                    <li>Menu Exploration and Category Filtering</li>
+                                    <li>Adding Items to Cart</li>
+                                    <li>Removing Items from Cart</li>
+                                    <li>Cart Page Functionality</li>
+                                    <li>Checkout Navigation</li>
+                                    <li>User Logout</li>
+                                    <li>Footer and Page Elements Verification</li>
+                                </ol>
+                                
+                                <h3>Deployment Status:</h3>
+                                <p style="color: #28a745;"><strong>✅ Application successfully deployed and running!</strong></p>
+                                <ul>
+                                    <li>Frontend: <a href="http://localhost:5173">http://localhost:5173</a></li>
+                                    <li>Backend API: <a href="http://localhost:4000">http://localhost:4000</a></li>
+                                    <li>Admin Panel: <a href="http://localhost:5174">http://localhost:5174</a></li>
+                                </ul>
+                                
+                                <hr style="border: 1px solid #dee2e6; margin: 20px 0;">
+                                <p style="color: #6c757d; font-size: 12px;">
+                                    This is an automated message from Jenkins CI/CD Pipeline.
+                                </p>
+                            </body>
+                            </html>
+                        """,
+                        to: "${NOTIFICATION_EMAIL}",
+                        mimeType: 'text/html',
+                        attachmentsPattern: 'tests/test-results.log'
+                    )
+                    echo "✅ Verification email sent to ${NOTIFICATION_EMAIL}"
+                } catch (Exception e) {
+                    echo "⚠️ Could not send email notification: ${e.message}"
+                    echo "Please configure SMTP settings in Jenkins (Manage Jenkins -> Configure System -> Extended E-mail Notification)"
+                }
             }
-            echo "✅ Deployment successful — all tests passed! Verification email sent."
+            echo "✅ Deployment successful — all tests passed!"
         }
         failure {
             script {
@@ -237,55 +254,61 @@ pipeline {
                     testLog = 'Test log not available'
                 }
                 
-                emailext(
-                    subject: "❌ FAILED: Tomato Food Delivery App - Build #${BUILD_NUMBER}",
-                    body: """
-                        <html>
-                        <body style="font-family: Arial, sans-serif;">
-                            <h2 style="color: #dc3545;">❌ Build Failed!</h2>
-                            
-                            <h3>Build Information:</h3>
-                            <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
-                                <tr style="background-color: #f8f9fa;">
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Project:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">Tomato Food Delivery App</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build Number:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;">#${BUILD_NUMBER}</td>
-                                </tr>
-                                <tr style="background-color: #f8f9fa;">
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build URL:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}">${BUILD_URL}</a></td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Console Output:</strong></td>
-                                    <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}console">${BUILD_URL}console</a></td>
-                                </tr>
-                            </table>
-                            
-                            <h3 style="color: #dc3545;">Action Required:</h3>
-                            <p>Please check the console output and test logs for details about the failure.</p>
-                            
-                            <h3>Test Log:</h3>
-                            <pre style="background-color: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; overflow-x: auto; max-height: 400px;">
+                // Try to send email, but don't fail if it doesn't work
+                try {
+                    emailext(
+                        subject: "❌ FAILED: Tomato Food Delivery App - Build #${BUILD_NUMBER}",
+                        body: """
+                            <html>
+                            <body style="font-family: Arial, sans-serif;">
+                                <h2 style="color: #dc3545;">❌ Build Failed!</h2>
+                                
+                                <h3>Build Information:</h3>
+                                <table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Project:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">Tomato Food Delivery App</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build Number:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;">#${BUILD_NUMBER}</td>
+                                    </tr>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Build URL:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}">${BUILD_URL}</a></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><strong>Console Output:</strong></td>
+                                        <td style="padding: 10px; border: 1px solid #dee2e6;"><a href="${BUILD_URL}console">${BUILD_URL}console</a></td>
+                                    </tr>
+                                </table>
+                                
+                                <h3 style="color: #dc3545;">Action Required:</h3>
+                                <p>Please check the console output and test logs for details about the failure.</p>
+                                
+                                <h3>Test Log:</h3>
+                                <pre style="background-color: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; overflow-x: auto; max-height: 400px;">
 ${testLog}
-                            </pre>
-                            
-                            <hr style="border: 1px solid #dee2e6; margin: 20px 0;">
-                            <p style="color: #6c757d; font-size: 12px;">
-                                This is an automated message from Jenkins CI/CD Pipeline.<br>
-                                Build triggered at: ${new Date()}
-                            </p>
-                        </body>
-                        </html>
-                    """,
-                    to: "${NOTIFICATION_EMAIL}",
-                    mimeType: 'text/html',
-                    attachmentsPattern: 'tests/test-results.log'
-                )
+                                </pre>
+                                
+                                <hr style="border: 1px solid #dee2e6; margin: 20px 0;">
+                                <p style="color: #6c757d; font-size: 12px;">
+                                    This is an automated message from Jenkins CI/CD Pipeline.
+                                </p>
+                            </body>
+                            </html>
+                        """,
+                        to: "${NOTIFICATION_EMAIL}",
+                        mimeType: 'text/html',
+                        attachmentsPattern: 'tests/test-results.log'
+                    )
+                    echo "📧 Failure notification email sent to ${NOTIFICATION_EMAIL}"
+                } catch (Exception e) {
+                    echo "⚠️ Could not send email notification: ${e.message}"
+                    echo "Please configure SMTP settings in Jenkins (Manage Jenkins -> Configure System -> Extended E-mail Notification)"
+                }
             }
-            echo "❌ Build/Tests failed — check the console output and email for details."
+            echo "❌ Build/Tests failed — check the console output for details."
         }
         always {
             // Clean up test artifacts if needed
