@@ -1,0 +1,23 @@
+{
+  "name": "tomato-selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium test cases for Tomato Food Delivery App",
+  "main": "test_suite.js",
+  "scripts": {
+    "test": "mocha --timeout 120000 test_suite.js",
+    "test:headed": "mocha --timeout 120000 test_suite.js"
+  },
+  "dependencies": {
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "selenium-webdriver": "^4.39.0"
+  },
+  "keywords": [
+    "selenium",
+    "testing",
+    "e2e",
+    "mern"
+  ],
+  "author": "",
+  "license": "ISC"
+}
